@@ -53,5 +53,44 @@ Provides:
 
 ---
 
+RUNNING THE LYFTR BACKEND
+1)Build & Start the Backend in Docker
+Run from the project root:
+ docker compose up -d --build
 
+2)Health Check Endpoints
+Liveness: curl http://localhost:8000/health/live
+   Expected:{"status": "ok"}
+Readiness:curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health/ready
+   Expected:200
+
+3)Sending a Webhook Request (Signed)
+Step A — Create a sample body:
+   {
+    "message_id": "m1",
+    "from": "+919876543210",
+    "to": "+14155550100",
+    "timestamp": "2025-01-15T10:00:00Z",
+    "text": "Hello"
+}
+
+Step B — Generate signature
+Inside the project root, run: python sign.py
+
+Step C — Send webhook POST
+curl -H "Content-Type: application/json" ^
+     -H "X-Signature: <YOUR_SIGNATURE>" ^
+     --data-binary @body.json ^
+     http://localhost:8000/webhook -v
+
+Expected: {"status": "accepted"}
+
+4)Check Stored Messages
+  curl "http://localhost:8000/messages"
+
+5)View Stats
+  curl "http://localhost:8000/stats"
+
+6)Stop the App
+  docker compose down
 
