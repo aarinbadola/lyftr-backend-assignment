@@ -4,7 +4,6 @@ from .config import settings
 import os
 
 def _sqlite_path_from_url(url: str) -> str:
-    # Accept formats like sqlite:////data/app.db
     if url.startswith("sqlite:///"):
         return url.replace("sqlite:///", "")
     return url
@@ -12,7 +11,6 @@ def _sqlite_path_from_url(url: str) -> str:
 DB_PATH = _sqlite_path_from_url(settings.DATABASE_URL)
 
 def get_conn():
-    # create parent folder if needed
     parent = os.path.dirname(DB_PATH)
     if parent and not os.path.exists(parent):
         os.makedirs(parent, exist_ok=True)

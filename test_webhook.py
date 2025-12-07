@@ -1,4 +1,3 @@
-# test_webhook.py
 import hmac, hashlib, urllib.request, sys, json, traceback
 
 SECRET = b"testsecret"

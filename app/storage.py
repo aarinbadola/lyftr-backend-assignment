@@ -3,20 +3,14 @@ from .models import get_conn
 from datetime import datetime
 
 def insert_message(message_id: str, from_msisdn: str, to_msisdn: str, ts: str, text: str) -> bool:
-    """
-    Insert a message idempotently.
-    Returns True if a new row was created, False if a duplicate was detected.
-    """
     conn = get_conn()
     try:
         created_at = datetime.utcnow().isoformat() + "Z"
-        # Use INSERT OR IGNORE to avoid raising on duplicate primary key
         cur = conn.execute(
             "INSERT OR IGNORE INTO messages(message_id, from_msisdn, to_msisdn, ts, text, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (message_id, from_msisdn, to_msisdn, ts, text, created_at),
         )
         conn.commit()
-        # rowcount is 1 when a row was inserted, 0 when ignored (duplicate)
         return cur.rowcount == 1
     finally:
         conn.close()
@@ -28,15 +22,9 @@ def message_exists(message_id: str) -> bool:
         return cur.fetchone() is not None
     finally:
         conn.close()
-# app/storage.py
-# (keep the existing imports and insert these functions)
 
 def _build_filters_sql(params: dict):
-    """
-    Build WHERE clause and an args tuple for parameterized queries.
-    params keys allowed: from_msisdn, to_msisdn, start_ts, end_ts
-    Returns (where_sql, args_list)
-    """
+    
     where_clauses = []
     args = []
 
@@ -60,10 +48,7 @@ def _build_filters_sql(params: dict):
     return where_sql, args
 
 def count_messages_filtered(**filters) -> int:
-    """
-    Count total messages matching the optional filters.
-    filters: from_msisdn, to_msisdn, start_ts, end_ts
-    """
+    
     conn = get_conn()
     try:
         where_sql, args = _build_filters_sql(filters)
@@ -75,17 +60,11 @@ def count_messages_filtered(**filters) -> int:
         conn.close()
 
 def query_messages(page: int = 1, per_page: int = 20, order: str = "desc", **filters):
-    """
-    Query messages with pagination and filters.
-    Returns (items_list, total_count).
-    """
-    # sanitize order
+    
     order_sql = "DESC" if order.lower() != "asc" else "ASC"
 
-    # build filters
     where_sql, args = _build_filters_sql(filters)
 
-    # pagination math
     if page < 1:
         page = 1
     if per_page < 1:
@@ -94,11 +73,10 @@ def query_messages(page: int = 1, per_page: int = 20, order: str = "desc", **fil
 
     conn = get_conn()
     try:
-        # fetch total count
+        
         count_q = "SELECT COUNT(*) AS cnt FROM messages" + where_sql
         total = conn.execute(count_q, args).fetchone()["cnt"]
 
-        # fetch page
         q = f"""
         SELECT message_id, from_msisdn, to_msisdn, ts, text, created_at
         FROM messages
@@ -110,12 +88,12 @@ def query_messages(page: int = 1, per_page: int = 20, order: str = "desc", **fil
         page_args.extend([per_page, offset])
         cur = conn.execute(q, page_args)
         rows = cur.fetchall()
-        # convert sqlite3.Row to dict
+        
         items = [dict(r) for r in rows]
         return items, total
     finally:
         conn.close()
-# app/storage.py
+
 from datetime import datetime, timedelta
 
 def count_total_messages(start_ts: str | None = None, end_ts: str | None = None, from_msisdn: str | None = None, to_msisdn: str | None = None) -> int:
@@ -134,16 +112,10 @@ def count_total_messages(start_ts: str | None = None, end_ts: str | None = None,
         conn.close()
 
 def messages_by_day(start_ts: str | None = None, end_ts: str | None = None, days: int | None = None):
-    """
-    Returns list of (date_str, count) grouped by date (YYYY-MM-DD), ordered ASC by date.
-    If `days` is provided, returns last `days` days up to today (UTC).
-    Otherwise uses start_ts/end_ts if provided, or full table.
-    """
+   
     conn = get_conn()
     try:
-        # compute window if days provided
         if days is not None:
-            # compute start_ts as days back (UTC), inclusive
             dt_end = datetime.utcnow()
             dt_start = dt_end - timedelta(days=days-1)
             start_ts = dt_start.isoformat() + "Z"
@@ -163,9 +135,6 @@ def messages_by_day(start_ts: str | None = None, end_ts: str | None = None, days
         conn.close()
 
 def messages_by_sender(limit: int = 10, start_ts: str | None = None, end_ts: str | None = None):
-    """
-    Returns top senders (from_msisdn) with counts, ordered desc by count.
-    """
     conn = get_conn()
     try:
         where, args = _build_filters_sql({"start_ts": start_ts, "end_ts": end_ts})
